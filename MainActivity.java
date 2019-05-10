@@ -1,3 +1,8 @@
+/*
+** Author: Will@PCVG
+** Description: Deploy DNN models to Android device
+**              for further estimation
+*/
 package willpcvg.appv0;
 
 import android.content.Intent;
@@ -300,12 +305,12 @@ public class MainActivity extends AppCompatActivity {
 
 
     public Bitmap portraitMatting(final Bitmap bitmap){
-        //1
+        //1 Obtained a single image from camera (front/rear)
         Bitmap resized_image = ImageUtils.processBitmap(bitmap, 600, 800);
         Bitmap org_image = ImageUtils.processBitmap(bitmap, bitmap.getWidth(), bitmap.getHeight());
         floatValues = ImageUtils.normalizeBitmap(resized_image, 800, 600, 1.0f);
         floatValues_org = ImageUtils.normalizeBitmap_org(org_image, org_image.getHeight(), org_image.getWidth(), 1.0f);
-        //2
+        //2 DeepLab-based portrait matting process, and channel filtering (into 3)
         floatValues = padInput(floatValues, 800, 600);
         tf.feed(INPUT_NAME, floatValues, 1, 800, 600, 6);
         tf.run(new String[]{OUTPUT_NAME});
@@ -314,11 +319,11 @@ public class MainActivity extends AppCompatActivity {
         PREDICTIONS = longToFloat(intFetcher, 800*600);
         floatValues = triChannelFromOne(PREDICTIONS, 800, 600);
         Bitmap resized_mask = bmFromFloatTest(floatValues, 800, 600);
-        //3
+        //3 Mask rescale and type converted, for further use (to identify the human depth)
         resized_mask = ImageUtils.processBitmap(resized_mask, bitmap.getWidth(), bitmap.getHeight());
         floatMask = ImageUtils.normalizeBitmap(resized_mask, bitmap.getHeight(),bitmap.getWidth(),1.0f);
 
-        /*
+        /* Remain these code for memory management, optional
         resized_image.recycle();
         org_image.recycle();
         resized_mask.recycle();
@@ -333,10 +338,8 @@ public class MainActivity extends AppCompatActivity {
             floatValues_org[i] = floatValues_org[i] * (floatMask[i]/255);
         }
         return bmFromFloatTest(floatValues_org, bitmap.getHeight(), bitmap.getWidth());
-        //4
+        //4 for expansion
     }
-
-
 
     public Bitmap predict(final Bitmap bitmap){
         Bitmap resized_image = ImageUtils.processBitmap(bitmap, 600, 800);
@@ -392,26 +395,6 @@ public class MainActivity extends AppCompatActivity {
         }
         return outputArray;
     }
-
-    /*public static Bitmap bmFromFloat(float[] singleChannel, int h, int w){
-        int[] output = new int[h * w];
-        int[] pix = new int[h * w];
-        int R, G, B;
-        for (int i = 0; i < h * w; i++){
-            output[i] = (int)(singleChannel[i]);
-        }
-        for (int y = 0; y < h; y++){
-            for (int x = 0; x < w * 3; x = x + 3){
-                int idx = y * w * 3 + x * 3;
-                R = output[idx] & 0xff;
-                G = output[idx] & 0xff;
-                B = output[idx] & 0xff;
-                pix[idx] = (R << 16) | (G << 8) | B;
-            }
-        }
-        Bitmap bmp = Bitmap.createBitmap(pix, w, h, Bitmap.Config.ARGB_8888);
-        return bmp;
-    }*/
 
     public static Bitmap bmFromFloatTest(float[] triChannel, int h, int w) {
         int[] output = new int[h * w * 3];
@@ -587,10 +570,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public static float[] imgBlur(float[] orgImg, float[] relDmat, int length, boolean v){
+        //Gaussian-like filtering. To simulate the "spot shape" in Bokeh effect
         float[] output = new float[length * 3];
-        //for (int idx = 0; idx < length * 3; idx++){
-        //    output[idx] = orgImg[idx];
-        //}
         float[][] gau3 = new float[3][3];
         float[][] gau5 = new float[5][5];
         float[][] gau = {{0.0625f, 0.125f, 0.0625f},{0.125f, 0.25f, 0.125f},{0.0625f, 0.125f, 0.0625f}};
@@ -716,5 +697,3 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 }
-
-
